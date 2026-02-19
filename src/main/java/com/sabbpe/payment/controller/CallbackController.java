@@ -3,8 +3,10 @@ package com.sabbpe.payment.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sabbpe.payment.entity.ClientProfile;
 import com.sabbpe.payment.entity.ClientTransactionProfile;
+import com.sabbpe.payment.entity.EasebuzzPayments;
 import com.sabbpe.payment.entity.EasebuzzRequestResponse;
 import com.sabbpe.payment.entity.Payment;
+import com.sabbpe.payment.repository.EasebuzzPaymentsRepository;
 import com.sabbpe.payment.repository.EasebuzzRequestResponseRepository;
 import com.sabbpe.payment.repository.PaymentRepository;
 import com.sabbpe.payment.security.EasebuzzCallbackHashUtil;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -32,6 +35,7 @@ public class CallbackController {
     private final CallbackAuditService auditService;
     private final MerchantValidationService merchantValidationService;
     private final EasebuzzRequestResponseRepository easebuzzRepo;
+    private final EasebuzzPaymentsRepository easebuzzPaymentsRepo;
     private final ObjectMapper objectMapper;
 
     // =====================================================
@@ -141,6 +145,43 @@ public class CallbackController {
 
         } catch (Exception ex) {
             System.out.println("Easebuzz callback logging failed: "
+                    + ex.getMessage());
+        }
+
+        // =====================================================
+        // ✅ INSERT / UPDATE easebuzz_payments TABLE
+        // =====================================================
+        try {
+
+            String normalizedStatus =
+                    "success".equalsIgnoreCase(status)
+                            ? "PAID"
+                            : "FAILED";
+
+            EasebuzzPayments record =
+                    easebuzzPaymentsRepo
+                            .findByTxnId(txnid)
+                            .orElse(new EasebuzzPayments());
+
+            record.setTxnId(txnid);
+            record.setMerchantId(udf1);
+            record.setAmount(new BigDecimal(amount));
+            record.setGatewayStatus(status);
+            record.setNormalizedStatus(normalizedStatus);
+            record.setHash(hash);
+            record.setHashValidated(true);
+            record.setRawResponse(
+                    objectMapper.writeValueAsString(payload));
+            record.setUpdatedAt(LocalDateTime.now());
+
+            if (record.getCreatedAt() == null) {
+                record.setCreatedAt(LocalDateTime.now());
+            }
+
+            easebuzzPaymentsRepo.save(record);
+
+        } catch (Exception ex) {
+            System.out.println("easebuzz_payments save failed: "
                     + ex.getMessage());
         }
 
