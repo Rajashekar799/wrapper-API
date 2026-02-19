@@ -14,7 +14,7 @@ public class MerchantAuthService {
     public Merchant authenticate(String merchantId,
                                  String authorizationHeader) {
 
-        // ✅ Check header exists
+        // ✅ Check Authorization header
         if (authorizationHeader == null ||
                 !authorizationHeader.startsWith("Bearer ")) {
             throw new RuntimeException("Missing Authorization header");
@@ -33,23 +33,26 @@ public class MerchantAuthService {
         String apiKey = parts[0];
         String apiSecret = parts[1];
 
-        // ✅ Fetch merchant
+        // ✅ Fetch merchant from DB
         Merchant merchant = merchantRepo
-        .findByMerchantId(merchantId)
-        .orElseThrow(() ->
-                new RuntimeException("Merchant not found"));
+                .findByMerchantId(merchantId)
+                .orElseThrow(() ->
+                        new RuntimeException("Merchant not found"));
 
-        if (merchant == null)
-            throw new RuntimeException("Merchant not found");
-
-        if (!merchant.getApiKey().equals(apiKey))
+        // ✅ Validate API key
+        if (!merchant.getApiKey().equals(apiKey)) {
             throw new RuntimeException("Invalid API Key");
+        }
 
-        if (!merchant.getApiSecret().equals(apiSecret))
+        // ✅ Validate API secret
+        if (!merchant.getApiSecret().equals(apiSecret)) {
             throw new RuntimeException("Invalid API Secret");
+        }
 
-        if (!Boolean.TRUE.equals(merchant.getActive()))
+        // ✅ Check merchant active status
+        if (!Boolean.TRUE.equals(merchant.getActive())) {
             throw new RuntimeException("Merchant inactive");
+        }
 
         return merchant;
     }
